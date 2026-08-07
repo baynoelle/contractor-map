@@ -15,6 +15,14 @@
       <div><h1>Contractor Map</h1><p><span id="mappedCount">0</span> of <span id="totalCount">0</span> locations mapped</p></div>
     </div>
     <label class="search"><span aria-hidden="true">⌕</span><span class="sr-only">Search contractors</span><input id="search" type="search" autocomplete="off" placeholder="Search company, contact, city, state…"></label>
+    <form id="serviceSearchForm" class="service-search">
+      <label for="serviceSearch">Find contractors who service</label>
+      <div class="service-search-row">
+        <input id="serviceSearch" type="search" autocomplete="off" placeholder="Town, county, or ZIP">
+        <button type="submit">Find</button>
+      </div>
+      <button id="clearServiceSearch" type="button" hidden>Clear service search</button>
+    </form>
     <div id="status" class="status">Preparing contractor locations…</div>
     <div id="list" class="list"></div>
   </aside>

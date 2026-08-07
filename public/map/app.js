@@ -20,6 +20,9 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 
 const list = document.getElementById('list');
 const search = document.getElementById('search');
+const serviceSearchForm = document.getElementById('serviceSearchForm');
+const serviceSearch = document.getElementById('serviceSearch');
+const clearServiceSearch = document.getElementById('clearServiceSearch');
 const statusEl = document.getElementById('status');
 const mappedCount = document.getElementById('mappedCount');
 const totalCount = document.getElementById('totalCount');
@@ -27,6 +30,8 @@ const servicePanel = document.getElementById('servicePanel');
 const markers = [];
 let countyFeatures = null;
 let serviceAreaLayer = null;
+let activeServiceMatches = null;
+let currentContractors = [];
 
 const esc = value => String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -176,6 +181,30 @@ async function geocode(query) {
   return { lat: Number(results[0].lat), lng: Number(results[0].lon) };
 }
 
+async function geocodePlace(query) {
+  const url = new URL('https://nominatim.openstreetmap.org/search');
+  url.searchParams.set('format', 'jsonv2');
+  url.searchParams.set('limit', '1');
+  url.searchParams.set('addressdetails', '1');
+  url.searchParams.set('countrycodes', 'us');
+  url.searchParams.set('q', query);
+
+  const response = await fetch(url);
+  if (!response.ok) return null;
+  const results = await response.json();
+  if (!results.length) return null;
+  const result = results[0];
+  return {
+    lat: Number(result.lat),
+    lng: Number(result.lon),
+    county: result.address?.county || '',
+    state: result.address?.state || '',
+    stateCode: result.address?.state_code || '',
+    postcode: result.address?.postcode || '',
+    displayName: result.display_name || query
+  };
+}
+
 async function getCountyFeatures() {
   if (countyFeatures) return countyFeatures;
   const response = await fetch(countiesTopoJsonUrl);
@@ -263,6 +292,66 @@ async function serviceAreaBoundaries(c) {
   );
 }
 
+function distanceMiles(a, b) {
+  const earthMiles = 3958.8;
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLng = (b.lng - a.lng) * Math.PI / 180;
+  const lat1 = a.lat * Math.PI / 180;
+  const lat2 = b.lat * Math.PI / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * earthMiles * Math.asin(Math.sqrt(h));
+}
+
+function textServiceMatch(c, query, place) {
+  const haystack = normalize([
+    c.countyServiceArea,
+    c.city,
+    c.state,
+    c.zip,
+    formatTravelRadius(c)
+  ].join(' '));
+  const needles = [
+    query,
+    place?.county,
+    place?.state,
+    place?.stateCode,
+    place?.postcode
+  ].flatMap(value => {
+    const normalized = normalize(value);
+    return [normalized, normalized.replace(/\bcounty\b/g, '').trim()];
+  }).filter(Boolean);
+  return needles.some(needle => haystack.includes(needle));
+}
+
+function contractorServicesPlace(c, query, place) {
+  if (place && radiusCanBeMapped(c) && c.coordinates) {
+    const distance = distanceMiles(c.coordinates, place);
+    if (distance <= Number(c.serviceRadiusMiles)) return true;
+  }
+  return textServiceMatch(c, query, place);
+}
+
+function applyFilters() {
+  const q = search.value.toLowerCase().trim();
+  document.querySelectorAll('.card').forEach(card => {
+    const matchesContractorSearch = !q || card.dataset.search.includes(q);
+    const matchesServiceSearch = !activeServiceMatches || activeServiceMatches.has(card.dataset.company);
+    const visible = matchesContractorSearch && matchesServiceSearch;
+    card.hidden = !visible;
+  });
+  markers.forEach(marker => {
+    const text = searchableText(marker.contractor);
+    const companyKey = normalize(marker.contractor.company);
+    const matchesContractorSearch = !q || text.includes(q);
+    const matchesServiceSearch = !activeServiceMatches || activeServiceMatches.has(companyKey);
+    if (matchesContractorSearch && matchesServiceSearch) {
+      if (!map.hasLayer(marker)) marker.addTo(map);
+    } else if (map.hasLayer(marker)) {
+      map.removeLayer(marker);
+    }
+  });
+}
+
 function searchableText(c) {
   return [
     c.company,
@@ -321,6 +410,7 @@ async function showServiceArea(marker) {
 function addCard(c, marker) {
   const card = document.createElement('article');
   card.className = 'card';
+  card.dataset.company = normalize(c.company);
   card.dataset.search = searchableText(c);
   const travelRadius = formatTravelRadius(c);
   const radius = travelRadius ? `<p>${esc(travelRadius)} travel radius</p>` : '';
@@ -354,6 +444,9 @@ function clearMap() {
 
 function renderContractors(contractors, sourceLabel) {
   clearMap();
+  currentContractors = contractors;
+  activeServiceMatches = null;
+  clearServiceSearch.hidden = true;
   totalCount.textContent = contractors.length;
   const bounds = [];
   let failures = 0;
@@ -394,15 +487,31 @@ async function load() {
   }
 }
 
-search.addEventListener('input', e => {
-  const q = e.target.value.toLowerCase().trim();
-  document.querySelectorAll('.card').forEach(card => card.hidden = !card.dataset.search.includes(q));
-  markers.forEach(marker => {
-    const text = searchableText(marker.contractor);
-    if (text.includes(q)) {
-      if (!map.hasLayer(marker)) marker.addTo(map);
-    } else if (map.hasLayer(marker)) map.removeLayer(marker);
-  });
+search.addEventListener('input', applyFilters);
+
+serviceSearchForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  const query = serviceSearch.value.trim();
+  if (!query) return;
+  statusEl.textContent = `Finding contractors for ${query}...`;
+  const place = await geocodePlace(query);
+  const matches = currentContractors.filter(contractor => contractorServicesPlace(contractor, query, place));
+  activeServiceMatches = new Set(matches.map(contractor => normalize(contractor.company)));
+  clearServiceSearch.hidden = false;
+  applyFilters();
+  const visible = markers.filter(marker => map.hasLayer(marker));
+  if (visible.length) map.fitBounds(L.featureGroup(visible).getBounds(), {padding:[35,35]});
+  statusEl.textContent = `${matches.length} contractor${matches.length === 1 ? '' : 's'} service ${place?.displayName || query}`;
+});
+
+clearServiceSearch.addEventListener('click', () => {
+  serviceSearch.value = '';
+  activeServiceMatches = null;
+  clearServiceSearch.hidden = true;
+  applyFilters();
+  const visible = markers.filter(marker => map.hasLayer(marker));
+  if (visible.length) map.fitBounds(L.featureGroup(visible).getBounds(), {padding:[35,35]});
+  statusEl.textContent = `${markers.length} pins loaded from Google Sheet`;
 });
 
 document.getElementById('fitBtn').onclick = () => {
