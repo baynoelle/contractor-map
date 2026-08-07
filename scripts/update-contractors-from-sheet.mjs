@@ -107,6 +107,21 @@ async function geocode(address) {
   };
 }
 
+async function geocodeContractor(contractor) {
+  const candidates = [
+    contractor.address,
+    [contractor.city, contractor.state, contractor.zip].filter(Boolean).join(', '),
+    [contractor.city, contractor.state].filter(Boolean).join(', ')
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    const coordinates = await geocode(candidate);
+    if (coordinates) return coordinates;
+    await sleep(1100);
+  }
+  return null;
+}
+
 const currentSource = await readFile(contractorsPath, 'utf8');
 const existing = readExistingContractors(currentSource);
 const existingByCompany = new Map(existing.map(contractor => [normalize(contractor.company), contractor]));
@@ -129,7 +144,8 @@ const contractors = [];
 const missingCoordinates = [];
 
 for (const row of rows.slice(1)) {
-  if (String(row[columns['Relationship Status']] || '').trim() !== 'Active Affiliate') continue;
+  const relationshipStatus = String(row[columns['Relationship Status']] || '').trim();
+  if (!['Active Affiliate', 'Affiliate'].includes(relationshipStatus)) continue;
 
   const company = String(row[columns['Company Name']] || '').trim();
   if (!company || normalize(company) === 'test company') continue;
@@ -158,7 +174,7 @@ for (const row of rows.slice(1)) {
 
 for (const contractor of missingCoordinates) {
   await sleep(1100);
-  contractor.coordinates = await geocode(contractor.address);
+  contractor.coordinates = await geocodeContractor(contractor);
 }
 
 const mapped = contractors.filter(contractor => contractor.coordinates).length;
@@ -167,7 +183,7 @@ await writeFile(contractorsPath, js);
 
 console.log(JSON.stringify({
   rows: rows.length - 1,
-  activeAffiliates: contractors.length,
+  includedAffiliates: contractors.length,
   mapped,
   geocoded: missingCoordinates.filter(contractor => contractor.coordinates).length,
   missing: contractors.filter(contractor => !contractor.coordinates).map(contractor => ({
