@@ -271,26 +271,36 @@ function serviceAreaHtml(c) {
     </dl>`;
 }
 
-function serviceAreaCountyNames(c) {
+function serviceAreaCountyTokens(c) {
   if (!c.countyServiceArea) return [];
   return c.countyServiceArea
     .split(/,|;|&|\band\b/i)
     .map(value => value.trim().replace(/\.$/, ''))
-    .map(value => value.replace(/\bcounties\b/i, '').replace(/\bcounty\b/i, '').trim())
-    .filter(value => value && value.length < 50)
-    .filter(value => !/\b(as far as|currently|open to|area|metro|locations?)\b/i.test(value))
-    .slice(0, 8);
+    .map(value => {
+      const stateMatch = value.match(/\b([A-Z]{2})\b$/);
+      const state = stateMatch ? stateMatch[1] : String(c.state || '').trim().toUpperCase();
+      const county = value
+        .replace(/\b([A-Z]{2})\b$/, '')
+        .replace(/\bcounties\b/i, '')
+        .replace(/\bcounty\b/i, '')
+        .trim();
+      return { county, state };
+    })
+    .filter(token => token.county && token.county.length < 50 && stateFips[token.state])
+    .filter(token => !/\b(as far as|currently|open to|area|metro|locations?|zip code)\b/i.test(token.county))
+    .slice(0, 12);
 }
 
 async function serviceAreaBoundaries(c) {
-  const fips = stateFips[String(c.state || '').trim().toUpperCase()];
-  const countyNames = serviceAreaCountyNames(c).map(normalize);
-  if (!fips || !countyNames.length) return [];
+  const countyTokens = serviceAreaCountyTokens(c);
+  if (!countyTokens.length) return [];
   const features = await getCountyFeatures();
-  return features.filter(feature =>
-    String(feature.id || '').startsWith(fips) &&
-    countyNames.includes(normalize(feature.properties?.name))
-  );
+  const wanted = new Set(countyTokens.map(token => `${stateFips[token.state]}:${normalize(token.county)}`));
+  return features.filter(feature => {
+    const featureState = String(feature.id || '').slice(0, 2);
+    const featureName = normalize(feature.properties?.name);
+    return wanted.has(`${featureState}:${featureName}`);
+  });
 }
 
 function distanceMiles(a, b) {
