@@ -13,6 +13,7 @@ const search = document.getElementById('search');
 const statusEl = document.getElementById('status');
 const mappedCount = document.getElementById('mappedCount');
 const totalCount = document.getElementById('totalCount');
+const servicePanel = document.getElementById('servicePanel');
 const markers = [];
 let radiusCircle = null;
 
@@ -188,6 +189,21 @@ function popupHtml(c) {
   </div>`;
 }
 
+function serviceAreaHtml(c) {
+  const county = c.countyServiceArea || 'No county service area listed';
+  const radius = c.serviceRadiusMiles
+    ? `${c.serviceRadiusMiles} mile radius shown in blue`
+    : 'No numeric travel radius listed';
+  return `<button class="service-close" type="button" aria-label="Hide service area">x</button>
+    <p class="eyebrow">Service Area</p>
+    <h2>${esc(c.company)}</h2>
+    <dl>
+      <div><dt>Base location</dt><dd>${esc([c.city, c.state].filter(Boolean).join(', ') || c.address)}</dd></div>
+      <div><dt>Area notes</dt><dd>${esc(county)}</dd></div>
+      <div><dt>Radius</dt><dd>${esc(radius)}</dd></div>
+    </dl>`;
+}
+
 function searchableText(c) {
   return [
     c.company,
@@ -204,7 +220,16 @@ function searchableText(c) {
 function showRadius(marker) {
   if (radiusCircle) map.removeLayer(radiusCircle);
   const miles = Number(marker.contractor.serviceRadiusMiles);
-  if (!miles) return;
+  servicePanel.innerHTML = serviceAreaHtml(marker.contractor);
+  servicePanel.hidden = false;
+  servicePanel.querySelector('.service-close').addEventListener('click', () => {
+    servicePanel.hidden = true;
+    if (radiusCircle) {
+      map.removeLayer(radiusCircle);
+      radiusCircle = null;
+    }
+  });
+  if (!miles) return null;
   radiusCircle = L.circle(marker.getLatLng(), {
     radius: miles * 1609.344,
     color: '#1d4ed8',
@@ -212,6 +237,7 @@ function showRadius(marker) {
     fillColor: '#60a5fa',
     fillOpacity: 0.2
   }).addTo(map);
+  return radiusCircle;
 }
 
 function addCard(c, marker) {
@@ -262,7 +288,12 @@ function renderContractors(contractors, sourceLabel) {
       .addTo(map)
       .bindPopup(popupHtml(c), {maxWidth:320});
     marker.contractor = c;
-    marker.on('click', () => showRadius(marker));
+    marker.on('click', () => {
+      const serviceArea = showRadius(marker);
+      if (serviceArea) {
+        map.fitBounds(L.featureGroup([marker, serviceArea]).getBounds(), {padding:[35,35], maxZoom:13});
+      }
+    });
     markers.push(marker);
     addCard(c, marker);
     bounds.push([c.coordinates.lat, c.coordinates.lng]);
