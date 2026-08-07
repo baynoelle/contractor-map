@@ -11,6 +11,7 @@ window.CONTRACTORS = [
     "state": "ID",
     "zip": "83607",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 43.6212046,
@@ -29,6 +30,7 @@ window.CONTRACTORS = [
     "state": "IL",
     "zip": "60505",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 41.7535663,
@@ -47,6 +49,7 @@ window.CONTRACTORS = [
     "state": "IL",
     "zip": "60481",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 41.3078989,
@@ -65,6 +68,7 @@ window.CONTRACTORS = [
     "state": "KS",
     "zip": "67214",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 37.6977848,
@@ -83,6 +87,7 @@ window.CONTRACTORS = [
     "state": "KS",
     "zip": "66215",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 38.9472102,
@@ -101,6 +106,7 @@ window.CONTRACTORS = [
     "state": "KS",
     "zip": "66215",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 38.953826,
@@ -119,6 +125,7 @@ window.CONTRACTORS = [
     "state": "KY",
     "zip": "41091",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 38.9355761,
@@ -137,6 +144,7 @@ window.CONTRACTORS = [
     "state": "MI",
     "zip": "48184",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 42.2814269,
@@ -155,6 +163,7 @@ window.CONTRACTORS = [
     "state": "MI",
     "zip": "48623",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 43.5325212,
@@ -173,6 +182,7 @@ window.CONTRACTORS = [
     "state": "MI",
     "zip": "48047",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 42.6431028,
@@ -191,6 +201,7 @@ window.CONTRACTORS = [
     "state": "MI",
     "zip": "49686",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 44.7606481,
@@ -209,6 +220,7 @@ window.CONTRACTORS = [
     "state": "MI",
     "zip": "49688",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 44.102512,
@@ -227,6 +239,7 @@ window.CONTRACTORS = [
     "state": "MI",
     "zip": "48842",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 42.6414805,
@@ -245,6 +258,7 @@ window.CONTRACTORS = [
     "state": "MI",
     "zip": "48165",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 42.511726,
@@ -263,6 +277,7 @@ window.CONTRACTORS = [
     "state": "MI",
     "zip": "49254",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 42.2330918,
@@ -281,6 +296,7 @@ window.CONTRACTORS = [
     "state": "MI",
     "zip": "49053",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 42.2886529,
@@ -299,6 +315,7 @@ window.CONTRACTORS = [
     "state": "MI",
     "zip": "48186",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 42.290405,
@@ -317,6 +334,7 @@ window.CONTRACTORS = [
     "state": "MI",
     "zip": "48178",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 42.4606345,
@@ -335,6 +353,7 @@ window.CONTRACTORS = [
     "state": "MI",
     "zip": "48184",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 42.2742583,
@@ -353,6 +372,7 @@ window.CONTRACTORS = [
     "state": "OH",
     "zip": "43229",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 40.0737804,
@@ -371,6 +391,7 @@ window.CONTRACTORS = [
     "state": "OH",
     "zip": "44035",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 41.3949254,
@@ -389,6 +410,7 @@ window.CONTRACTORS = [
     "state": "OH",
     "zip": "45245",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 39.0332978,
@@ -407,6 +429,7 @@ window.CONTRACTORS = [
     "state": "TX",
     "zip": "75706",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 32.3512601,
@@ -425,6 +448,7 @@ window.CONTRACTORS = [
     "state": "MI",
     "zip": "48631",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 43.7248598,
@@ -443,6 +467,7 @@ window.CONTRACTORS = [
     "state": "TN",
     "zip": "38016",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 35.1772951,
@@ -461,6 +486,7 @@ window.CONTRACTORS = [
     "state": "TX",
     "zip": "79567",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 31.956042,
@@ -479,6 +505,7 @@ window.CONTRACTORS = [
     "state": "NC",
     "zip": "27610",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 35.7209875,
@@ -497,6 +524,7 @@ window.CONTRACTORS = [
     "state": "IA",
     "zip": "50021",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 41.7320796,
@@ -515,6 +543,7 @@ window.CONTRACTORS = [
     "state": "IN",
     "zip": "47725",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 37.970495,
@@ -533,6 +562,7 @@ window.CONTRACTORS = [
     "state": "MD",
     "zip": "21643",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 38.6346863,
@@ -551,6 +581,7 @@ window.CONTRACTORS = [
     "state": "IN",
     "zip": "46901",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 40.4864444,
@@ -569,6 +600,7 @@ window.CONTRACTORS = [
     "state": "MN",
     "zip": "55112",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 45.0876307,
@@ -587,6 +619,7 @@ window.CONTRACTORS = [
     "state": "WA",
     "zip": "99206",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 47.6680781,
@@ -605,7 +638,8 @@ window.CONTRACTORS = [
     "state": "NJ",
     "zip": "8886",
     "countyServiceArea": "As far as Scranton PA",
-    "serviceRadiusMiles": 3,
+    "serviceRadiusRaw": "up to 3 hrs round trip",
+    "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 40.7045444,
       "lng": -75.116005
@@ -623,6 +657,7 @@ window.CONTRACTORS = [
     "state": "TX",
     "zip": "77805",
     "countyServiceArea": "",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 30.6743643,
@@ -641,6 +676,7 @@ window.CONTRACTORS = [
     "state": "OH",
     "zip": "43551",
     "countyServiceArea": "Metro Toledo Area",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 41.5157186,
@@ -659,6 +695,7 @@ window.CONTRACTORS = [
     "state": "PA",
     "zip": "18071",
     "countyServiceArea": "Carbon, Monroe, Lehigh, Northampton, Bucks, Berks, Montgomery, Delaware",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 40.8014826,
@@ -677,7 +714,8 @@ window.CONTRACTORS = [
     "state": "MI",
     "zip": "49525",
     "countyServiceArea": "West MI, Cadillac, Clare, Lansing, Jackson, Marshall, kalamazoo, currently and open to more locations",
-    "serviceRadiusMiles": 1.5,
+    "serviceRadiusRaw": "1.5/ 2 hrs for some accts",
+    "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 43.0287395,
       "lng": -85.6423834
@@ -695,6 +733,7 @@ window.CONTRACTORS = [
     "state": "MI",
     "zip": "49254",
     "countyServiceArea": "Jackson, Ann Arbor, Lansing, Detroit, Battel Creek and Grand Rapids",
+    "serviceRadiusRaw": "50-100 miles",
     "serviceRadiusMiles": 50,
     "coordinates": {
       "lat": 42.2351669,
@@ -713,6 +752,7 @@ window.CONTRACTORS = [
     "state": "MI",
     "zip": "48192",
     "countyServiceArea": "Wayne, Oakland, Macomb, Washtenaw, Livingston, and Lenawee Counties.",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 42.2134479,
@@ -731,6 +771,7 @@ window.CONTRACTORS = [
     "state": "VA",
     "zip": "23231",
     "countyServiceArea": "Sussex County, Henrico, Prince George, Petersburg & Ravenscraig",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 37.5131191,
@@ -749,6 +790,7 @@ window.CONTRACTORS = [
     "state": "NY",
     "zip": "14468",
     "countyServiceArea": "Monroe",
+    "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
       "lat": 43.274131,

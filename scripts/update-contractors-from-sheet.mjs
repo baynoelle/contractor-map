@@ -65,9 +65,12 @@ function cleanEmail(value) {
   return String(value || '').split('/')[0].trim();
 }
 
-function parseMiles(value) {
-  const match = String(value || '').match(/\d+(\.\d+)?/);
-  return match ? Number(match[0]) : null;
+function parseTravelRadius(value) {
+  const raw = String(value || '').trim();
+  const match = raw.match(/\d+(\.\d+)?/);
+  const isTime = /\b(hours?|hrs?)\b/i.test(raw);
+  const miles = match && !isTime ? Number(match[0]) : null;
+  return { raw, miles };
 }
 
 function readExistingContractors(source) {
@@ -152,6 +155,7 @@ for (const row of rows.slice(1)) {
 
   const address = makeAddress(row, columns);
   const existingMatch = existingByCompany.get(normalize(company)) || existingByAddress.get(normalize(address));
+  const travelRadius = parseTravelRadius(row[columns['Travel Radius (Miles)']]);
   const contractor = {
     company,
     contact: String(row[columns['Contact Name']] || '').trim(),
@@ -164,7 +168,8 @@ for (const row of rows.slice(1)) {
     state: String(row[columns['State']] || '').trim(),
     zip: String(row[columns['ZIP Code']] || '').trim(),
     countyServiceArea: String(row[columns['County Service Area']] || '').trim(),
-    serviceRadiusMiles: parseMiles(row[columns['Travel Radius (Miles)']]),
+    serviceRadiusRaw: travelRadius.raw,
+    serviceRadiusMiles: travelRadius.miles,
     coordinates: existingMatch?.coordinates || null
   };
 

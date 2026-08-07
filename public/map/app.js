@@ -82,9 +82,22 @@ function cleanEmail(value) {
   return String(value || '').split('/')[0].trim();
 }
 
-function parseMiles(value) {
-  const match = String(value || '').match(/\d+(\.\d+)?/);
-  return match ? Number(match[0]) : null;
+function parseTravelRadius(value) {
+  const raw = String(value || '').trim();
+  const match = raw.match(/\d+(\.\d+)?/);
+  const isTime = /\b(hours?|hrs?)\b/i.test(raw);
+  const miles = match && !isTime ? Number(match[0]) : null;
+  return { raw, miles };
+}
+
+function formatTravelRadius(c) {
+  if (c.serviceRadiusRaw) return c.serviceRadiusRaw;
+  if (c.serviceRadiusMiles) return `${c.serviceRadiusMiles} miles`;
+  return '';
+}
+
+function radiusCanBeMapped(c) {
+  return Number(c.serviceRadiusMiles) > 0;
 }
 
 function makeAddress(row, columns) {
@@ -99,6 +112,7 @@ function makeAddress(row, columns) {
 function contractorFromRow(row, columns) {
   const address = makeAddress(row, columns);
   const company = String(row[columns['Company Name']] || '').trim();
+  const travelRadius = parseTravelRadius(row[columns['Travel Radius (Miles)']]);
   return {
     company,
     contact: String(row[columns['Contact Name']] || '').trim(),
@@ -111,7 +125,8 @@ function contractorFromRow(row, columns) {
     state: String(row[columns['State']] || '').trim(),
     zip: String(row[columns['ZIP Code']] || '').trim(),
     countyServiceArea: String(row[columns['County Service Area']] || '').trim(),
-    serviceRadiusMiles: parseMiles(row[columns['Travel Radius (Miles)']]),
+    serviceRadiusRaw: travelRadius.raw,
+    serviceRadiusMiles: travelRadius.miles,
     coordinates: coordinateCache.get(normalize(company)) || coordinateCache.get(normalize(address)) || null
   };
 }
@@ -171,8 +186,9 @@ async function geocodeMissingContractors(contractors) {
 }
 
 function popupHtml(c) {
-  const radius = c.serviceRadiusMiles
-    ? `<p><strong>Travel radius:</strong> ${esc(c.serviceRadiusMiles)} miles</p>`
+  const travelRadius = formatTravelRadius(c);
+  const radius = travelRadius
+    ? `<p><strong>Travel radius:</strong> ${esc(travelRadius)}</p>`
     : '';
   const county = c.countyServiceArea
     ? `<p><strong>County service area:</strong> ${esc(c.countyServiceArea)}</p>`
@@ -191,9 +207,10 @@ function popupHtml(c) {
 
 function serviceAreaHtml(c) {
   const county = c.countyServiceArea || 'No county service area listed';
-  const radius = c.serviceRadiusMiles
+  const travelRadius = formatTravelRadius(c);
+  const radius = radiusCanBeMapped(c)
     ? `${c.serviceRadiusMiles} mile radius shown in blue`
-    : 'No numeric travel radius listed';
+    : travelRadius || 'No travel radius listed';
   return `<button class="service-close" type="button" aria-label="Hide service area">x</button>
     <p class="eyebrow">Service Area</p>
     <h2>${esc(c.company)}</h2>
@@ -213,13 +230,13 @@ function searchableText(c) {
     c.state,
     c.zip,
     c.countyServiceArea,
-    c.serviceRadiusMiles ? `${c.serviceRadiusMiles} miles` : ''
+    formatTravelRadius(c)
   ].join(' ').toLowerCase();
 }
 
 function showRadius(marker) {
   if (radiusCircle) map.removeLayer(radiusCircle);
-  const miles = Number(marker.contractor.serviceRadiusMiles);
+  const miles = radiusCanBeMapped(marker.contractor) ? Number(marker.contractor.serviceRadiusMiles) : null;
   servicePanel.innerHTML = serviceAreaHtml(marker.contractor);
   servicePanel.hidden = false;
   servicePanel.querySelector('.service-close').addEventListener('click', () => {
@@ -244,7 +261,8 @@ function addCard(c, marker) {
   const card = document.createElement('article');
   card.className = 'card';
   card.dataset.search = searchableText(c);
-  const radius = c.serviceRadiusMiles ? `<p>${esc(c.serviceRadiusMiles)} mile travel radius</p>` : '';
+  const travelRadius = formatTravelRadius(c);
+  const radius = travelRadius ? `<p>${esc(travelRadius)} travel radius</p>` : '';
   card.innerHTML = `<h3><span class="dot"></span>${esc(c.company)}</h3><p>${esc(c.contact)}</p><p>${esc(c.address)}</p>${radius}`;
   card.tabIndex = 0;
   card.setAttribute('role', 'button');
