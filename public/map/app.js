@@ -1,5 +1,15 @@
 const sheetCsvUrl = 'https://docs.google.com/spreadsheets/d/1WErGMtEQuGYbfyq6p1KudxAslvOTqIgOcrDN4ruahoc/export?format=csv&gid=2';
+const countiesTopoJsonUrl = 'https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json';
 const includedStatuses = new Set(['Active Affiliate', 'Affiliate']);
+const stateFips = {
+  AL: '01', AK: '02', AZ: '04', AR: '05', CA: '06', CO: '08', CT: '09', DE: '10',
+  DC: '11', FL: '12', GA: '13', HI: '15', ID: '16', IL: '17', IN: '18', IA: '19',
+  KS: '20', KY: '21', LA: '22', ME: '23', MD: '24', MA: '25', MI: '26', MN: '27',
+  MS: '28', MO: '29', MT: '30', NE: '31', NV: '32', NH: '33', NJ: '34', NM: '35',
+  NY: '36', NC: '37', ND: '38', OH: '39', OK: '40', OR: '41', PA: '42', RI: '44',
+  SC: '45', SD: '46', TN: '47', TX: '48', UT: '49', VT: '50', VA: '51', WA: '53',
+  WV: '54', WI: '55', WY: '56'
+};
 const coordinateCache = new Map();
 
 const map = L.map('map', { zoomControl: true }).setView([39.5, -92.5], 4);
@@ -15,7 +25,8 @@ const mappedCount = document.getElementById('mappedCount');
 const totalCount = document.getElementById('totalCount');
 const servicePanel = document.getElementById('servicePanel');
 const markers = [];
-let radiusCircle = null;
+let countyFeatures = null;
+let serviceAreaLayer = null;
 
 const esc = value => String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -165,6 +176,15 @@ async function geocode(query) {
   return { lat: Number(results[0].lat), lng: Number(results[0].lon) };
 }
 
+async function getCountyFeatures() {
+  if (countyFeatures) return countyFeatures;
+  const response = await fetch(countiesTopoJsonUrl);
+  if (!response.ok || !window.topojson) return [];
+  const topology = await response.json();
+  countyFeatures = window.topojson.feature(topology, topology.objects.counties).features;
+  return countyFeatures;
+}
+
 async function geocodeMissingContractors(contractors) {
   const missing = contractors.filter(contractor => !contractor.coordinates && contractor.address);
   for (let i = 0; i < missing.length; i++) {
@@ -221,6 +241,28 @@ function serviceAreaHtml(c) {
     </dl>`;
 }
 
+function serviceAreaCountyNames(c) {
+  if (!c.countyServiceArea) return [];
+  return c.countyServiceArea
+    .split(/,|;|&|\band\b/i)
+    .map(value => value.trim().replace(/\.$/, ''))
+    .map(value => value.replace(/\bcounties\b/i, '').replace(/\bcounty\b/i, '').trim())
+    .filter(value => value && value.length < 50)
+    .filter(value => !/\b(as far as|currently|open to|area|metro|locations?)\b/i.test(value))
+    .slice(0, 8);
+}
+
+async function serviceAreaBoundaries(c) {
+  const fips = stateFips[String(c.state || '').trim().toUpperCase()];
+  const countyNames = serviceAreaCountyNames(c).map(normalize);
+  if (!fips || !countyNames.length) return [];
+  const features = await getCountyFeatures();
+  return features.filter(feature =>
+    String(feature.id || '').startsWith(fips) &&
+    countyNames.includes(normalize(feature.properties?.name))
+  );
+}
+
 function searchableText(c) {
   return [
     c.company,
@@ -234,27 +276,46 @@ function searchableText(c) {
   ].join(' ').toLowerCase();
 }
 
-function showRadius(marker) {
-  if (radiusCircle) map.removeLayer(radiusCircle);
+function clearServiceArea() {
+  if (serviceAreaLayer) {
+    map.removeLayer(serviceAreaLayer);
+    serviceAreaLayer = null;
+  }
+}
+
+async function showServiceArea(marker) {
+  clearServiceArea();
   const miles = radiusCanBeMapped(marker.contractor) ? Number(marker.contractor.serviceRadiusMiles) : null;
   servicePanel.innerHTML = serviceAreaHtml(marker.contractor);
   servicePanel.hidden = false;
   servicePanel.querySelector('.service-close').addEventListener('click', () => {
     servicePanel.hidden = true;
-    if (radiusCircle) {
-      map.removeLayer(radiusCircle);
-      radiusCircle = null;
-    }
+    clearServiceArea();
   });
-  if (!miles) return null;
-  radiusCircle = L.circle(marker.getLatLng(), {
-    radius: miles * 1609.344,
-    color: '#1d4ed8',
-    weight: 2,
-    fillColor: '#60a5fa',
-    fillOpacity: 0.2
+
+  if (miles) {
+    serviceAreaLayer = L.circle(marker.getLatLng(), {
+      radius: miles * 1609.344,
+      color: '#1d4ed8',
+      weight: 2,
+      fillColor: '#60a5fa',
+      fillOpacity: 0.2
+    }).addTo(map);
+    return serviceAreaLayer;
+  }
+
+  const boundaries = await serviceAreaBoundaries(marker.contractor);
+
+  if (!boundaries.length) return null;
+  serviceAreaLayer = L.geoJSON(boundaries, {
+    style: {
+      color: '#1d4ed8',
+      weight: 2,
+      fillColor: '#60a5fa',
+      fillOpacity: 0.2
+    }
   }).addTo(map);
-  return radiusCircle;
+  return serviceAreaLayer;
 }
 
 function addCard(c, marker) {
@@ -267,11 +328,11 @@ function addCard(c, marker) {
   card.tabIndex = 0;
   card.setAttribute('role', 'button');
   card.setAttribute('aria-label', `Show ${c.company} on the map`);
-  const selectContractor = () => {
+  const selectContractor = async () => {
     document.querySelectorAll('.card').forEach(x => x.classList.remove('active'));
     card.classList.add('active');
-    showRadius(marker);
-    const view = radiusCircle ? L.featureGroup([marker, radiusCircle]) : L.featureGroup([marker]);
+    const serviceArea = await showServiceArea(marker);
+    const view = serviceArea ? L.featureGroup([marker, serviceArea]) : L.featureGroup([marker]);
     map.fitBounds(view.getBounds(), {padding:[35,35], maxZoom:13});
     marker.openPopup();
   };
@@ -287,10 +348,7 @@ function addCard(c, marker) {
 
 function clearMap() {
   markers.splice(0).forEach(marker => marker.remove());
-  if (radiusCircle) {
-    map.removeLayer(radiusCircle);
-    radiusCircle = null;
-  }
+  clearServiceArea();
   list.replaceChildren();
 }
 
@@ -306,8 +364,8 @@ function renderContractors(contractors, sourceLabel) {
       .addTo(map)
       .bindPopup(popupHtml(c), {maxWidth:320});
     marker.contractor = c;
-    marker.on('click', () => {
-      const serviceArea = showRadius(marker);
+    marker.on('click', async () => {
+      const serviceArea = await showServiceArea(marker);
       if (serviceArea) {
         map.fitBounds(L.featureGroup([marker, serviceArea]).getBounds(), {padding:[35,35], maxZoom:13});
       }
