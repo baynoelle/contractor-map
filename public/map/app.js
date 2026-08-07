@@ -1,3 +1,7 @@
+const sheetCsvUrl = 'https://docs.google.com/spreadsheets/d/1WErGMtEQuGYbfyq6p1KudxAslvOTqIgOcrDN4ruahoc/export?format=csv&gid=2';
+const includedStatuses = new Set(['Active Affiliate', 'Affiliate']);
+const coordinateCache = new Map();
+
 const map = L.map('map', { zoomControl: true }).setView([39.5, -92.5], 4);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
@@ -10,15 +14,160 @@ const statusEl = document.getElementById('status');
 const mappedCount = document.getElementById('mappedCount');
 const totalCount = document.getElementById('totalCount');
 const markers = [];
-const markerByContractor = new Map();
 let radiusCircle = null;
 
-totalCount.textContent = CONTRACTORS.length;
-
 const esc = value => String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const normalize = value => String(value || '').toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, ' ').trim();
 const externalLink = (url, label) => url
   ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`
   : `<span class="unavailable">${label} unavailable</span>`;
+
+for (const contractor of window.CONTRACTORS || []) {
+  if (!contractor.coordinates) continue;
+  coordinateCache.set(normalize(contractor.company), contractor.coordinates);
+  coordinateCache.set(normalize(contractor.address), contractor.coordinates);
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let value = '';
+  let quoted = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const next = text[i + 1];
+
+    if (quoted) {
+      if (char === '"' && next === '"') {
+        value += '"';
+        i++;
+      } else if (char === '"') {
+        quoted = false;
+      } else {
+        value += char;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      quoted = true;
+    } else if (char === ',') {
+      row.push(value);
+      value = '';
+    } else if (char === '\n') {
+      row.push(value);
+      rows.push(row);
+      row = [];
+      value = '';
+    } else if (char !== '\r') {
+      value += char;
+    }
+  }
+
+  row.push(value);
+  rows.push(row);
+  return rows.filter(cells => cells.some(cell => cell.trim()));
+}
+
+function cleanUrl(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed || /^no\s/i.test(trimmed)) return '';
+  return trimmed;
+}
+
+function cleanEmail(value) {
+  return String(value || '').split('/')[0].trim();
+}
+
+function parseMiles(value) {
+  const match = String(value || '').match(/\d+(\.\d+)?/);
+  return match ? Number(match[0]) : null;
+}
+
+function makeAddress(row, columns) {
+  return [
+    row[columns['Street']],
+    row[columns['City']],
+    row[columns['State']],
+    row[columns['ZIP Code']]
+  ].map(value => String(value || '').trim()).filter(Boolean).join(', ');
+}
+
+function contractorFromRow(row, columns) {
+  const address = makeAddress(row, columns);
+  const company = String(row[columns['Company Name']] || '').trim();
+  return {
+    company,
+    contact: String(row[columns['Contact Name']] || '').trim(),
+    phone: String(row[columns['Phone']] || '').trim(),
+    email: cleanEmail(row[columns['Email']]),
+    website: cleanUrl(row[columns['Website']]),
+    facebook: cleanUrl(row[columns['Facebook Page']]),
+    address,
+    city: String(row[columns['City']] || '').trim(),
+    state: String(row[columns['State']] || '').trim(),
+    zip: String(row[columns['ZIP Code']] || '').trim(),
+    countyServiceArea: String(row[columns['County Service Area']] || '').trim(),
+    serviceRadiusMiles: parseMiles(row[columns['Travel Radius (Miles)']]),
+    coordinates: coordinateCache.get(normalize(company)) || coordinateCache.get(normalize(address)) || null
+  };
+}
+
+async function loadSheetContractors() {
+  const response = await fetch(`${sheetCsvUrl}&cacheBust=${Date.now()}`, { cache: 'no-store' });
+  if (!response.ok) throw new Error('Sheet could not be loaded');
+
+  const rows = parseCsv(await response.text());
+  const headers = rows[0].map(header => header.trim());
+  const columns = Object.fromEntries(headers.map((header, index) => [header, index]));
+  const contractors = [];
+
+  for (const row of rows.slice(1)) {
+    const status = String(row[columns['Relationship Status']] || '').trim();
+    if (!includedStatuses.has(status)) continue;
+    const company = String(row[columns['Company Name']] || '').trim();
+    if (!company || normalize(company) === 'test company') continue;
+    contractors.push(contractorFromRow(row, columns));
+  }
+
+  return contractors;
+}
+
+async function geocode(query) {
+  const url = new URL('https://nominatim.openstreetmap.org/search');
+  url.searchParams.set('format', 'jsonv2');
+  url.searchParams.set('limit', '1');
+  url.searchParams.set('countrycodes', 'us');
+  url.searchParams.set('q', query);
+
+  const response = await fetch(url);
+  if (!response.ok) return null;
+  const results = await response.json();
+  if (!results.length) return null;
+  return { lat: Number(results[0].lat), lng: Number(results[0].lon) };
+}
+
+async function geocodeMissingContractors(contractors) {
+  const missing = contractors.filter(contractor => !contractor.coordinates && contractor.address);
+  for (let i = 0; i < missing.length; i++) {
+    const contractor = missing[i];
+    statusEl.textContent = `Placing new address ${i + 1} of ${missing.length}...`;
+    const candidates = [
+      contractor.address,
+      [contractor.city, contractor.state, contractor.zip].filter(Boolean).join(', '),
+      [contractor.city, contractor.state].filter(Boolean).join(', ')
+    ].filter(Boolean);
+
+    for (const candidate of candidates) {
+      contractor.coordinates = await geocode(candidate);
+      if (contractor.coordinates) break;
+      await sleep(1100);
+    }
+    await sleep(1100);
+  }
+}
 
 function popupHtml(c) {
   const radius = c.serviceRadiusMiles
@@ -92,10 +241,22 @@ function addCard(c, marker) {
   list.appendChild(card);
 }
 
-function load() {
+function clearMap() {
+  markers.splice(0).forEach(marker => marker.remove());
+  if (radiusCircle) {
+    map.removeLayer(radiusCircle);
+    radiusCircle = null;
+  }
+  list.replaceChildren();
+}
+
+function renderContractors(contractors, sourceLabel) {
+  clearMap();
+  totalCount.textContent = contractors.length;
   const bounds = [];
   let failures = 0;
-  for (const c of CONTRACTORS) {
+
+  for (const c of contractors) {
     if (!c.coordinates) { failures++; continue; }
     const marker = L.marker([c.coordinates.lat, c.coordinates.lng])
       .addTo(map)
@@ -103,13 +264,27 @@ function load() {
     marker.contractor = c;
     marker.on('click', () => showRadius(marker));
     markers.push(marker);
-    markerByContractor.set(c.company, marker);
     addCard(c, marker);
     bounds.push([c.coordinates.lat, c.coordinates.lng]);
   }
+
   mappedCount.textContent = markers.length;
   if (bounds.length) map.fitBounds(bounds, {padding:[35,35]});
-  statusEl.textContent = failures ? `${markers.length} mapped · ${failures} unavailable` : 'All contractor pins are ready';
+  statusEl.textContent = failures
+    ? `${markers.length} mapped from ${sourceLabel} · ${failures} need cleaner addresses`
+    : `${markers.length} pins loaded from ${sourceLabel}`;
+}
+
+async function load() {
+  statusEl.textContent = 'Loading latest Google Sheet...';
+  try {
+    const contractors = await loadSheetContractors();
+    await geocodeMissingContractors(contractors);
+    renderContractors(contractors, 'Google Sheet');
+  } catch (error) {
+    renderContractors(window.CONTRACTORS || [], 'saved backup');
+    statusEl.textContent = 'Showing saved backup because the Google Sheet could not load';
+  }
 }
 
 search.addEventListener('input', e => {
