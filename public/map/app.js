@@ -352,6 +352,23 @@ function applyFilters() {
   });
 }
 
+function fitVisibleMarkers() {
+  const visible = markers.filter(marker => map.hasLayer(marker));
+  if (visible.length) map.fitBounds(L.featureGroup(visible).getBounds(), {padding:[35,35]});
+}
+
+function resetMapView() {
+  search.value = '';
+  serviceSearch.value = '';
+  activeServiceMatches = null;
+  clearServiceSearch.hidden = true;
+  servicePanel.hidden = true;
+  clearServiceArea();
+  applyFilters();
+  fitVisibleMarkers();
+  statusEl.textContent = `${markers.length} pins loaded from Google Sheet`;
+}
+
 function searchableText(c) {
   return [
     c.company,
@@ -499,8 +516,7 @@ serviceSearchForm.addEventListener('submit', async event => {
   activeServiceMatches = new Set(matches.map(contractor => normalize(contractor.company)));
   clearServiceSearch.hidden = false;
   applyFilters();
-  const visible = markers.filter(marker => map.hasLayer(marker));
-  if (visible.length) map.fitBounds(L.featureGroup(visible).getBounds(), {padding:[35,35]});
+  fitVisibleMarkers();
   statusEl.textContent = `${matches.length} contractor${matches.length === 1 ? '' : 's'} service ${place?.displayName || query}`;
 });
 
@@ -509,14 +525,10 @@ clearServiceSearch.addEventListener('click', () => {
   activeServiceMatches = null;
   clearServiceSearch.hidden = true;
   applyFilters();
-  const visible = markers.filter(marker => map.hasLayer(marker));
-  if (visible.length) map.fitBounds(L.featureGroup(visible).getBounds(), {padding:[35,35]});
+  fitVisibleMarkers();
   statusEl.textContent = `${markers.length} pins loaded from Google Sheet`;
 });
 
-document.getElementById('fitBtn').onclick = () => {
-  const visible = markers.filter(m => map.hasLayer(m));
-  if (visible.length) map.fitBounds(L.featureGroup(visible).getBounds(), {padding:[35,35]});
-};
+document.getElementById('fitBtn').onclick = resetMapView;
 
 load();
