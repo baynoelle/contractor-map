@@ -31,6 +31,7 @@ const markers = [];
 let countyFeatures = null;
 let serviceAreaLayer = null;
 let activeServiceMatches = null;
+let activeServiceDistances = new Map();
 let currentContractors = [];
 
 const esc = value => String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -331,6 +332,11 @@ function contractorServicesPlace(c, query, place) {
   return textServiceMatch(c, query, place);
 }
 
+function contractorDistance(c, place) {
+  if (!place || !c.coordinates) return Number.POSITIVE_INFINITY;
+  return distanceMiles(c.coordinates, place);
+}
+
 function applyFilters() {
   const q = search.value.toLowerCase().trim();
   document.querySelectorAll('.card').forEach(card => {
@@ -350,6 +356,15 @@ function applyFilters() {
       map.removeLayer(marker);
     }
   });
+  if (activeServiceMatches) {
+    const cards = Array.from(list.querySelectorAll('.card'));
+    cards.sort((a, b) => {
+      const aDistance = activeServiceDistances.get(a.dataset.company) ?? Number.POSITIVE_INFINITY;
+      const bDistance = activeServiceDistances.get(b.dataset.company) ?? Number.POSITIVE_INFINITY;
+      return aDistance - bDistance || a.dataset.name.localeCompare(b.dataset.name);
+    });
+    cards.forEach(card => list.appendChild(card));
+  }
 }
 
 function fitVisibleMarkers() {
@@ -361,6 +376,7 @@ function resetMapView() {
   search.value = '';
   serviceSearch.value = '';
   activeServiceMatches = null;
+  activeServiceDistances = new Map();
   clearServiceSearch.hidden = true;
   servicePanel.hidden = true;
   clearServiceArea();
@@ -428,6 +444,7 @@ function addCard(c, marker) {
   const card = document.createElement('article');
   card.className = 'card';
   card.dataset.company = normalize(c.company);
+  card.dataset.name = c.company;
   card.dataset.search = searchableText(c);
   const travelRadius = formatTravelRadius(c);
   const radius = travelRadius ? `<p>${esc(travelRadius)} travel radius</p>` : '';
@@ -463,6 +480,7 @@ function renderContractors(contractors, sourceLabel) {
   clearMap();
   currentContractors = contractors;
   activeServiceMatches = null;
+  activeServiceDistances = new Map();
   clearServiceSearch.hidden = true;
   totalCount.textContent = contractors.length;
   const bounds = [];
@@ -514,6 +532,10 @@ serviceSearchForm.addEventListener('submit', async event => {
   const place = await geocodePlace(query);
   const matches = currentContractors.filter(contractor => contractorServicesPlace(contractor, query, place));
   activeServiceMatches = new Set(matches.map(contractor => normalize(contractor.company)));
+  activeServiceDistances = new Map(matches.map(contractor => [
+    normalize(contractor.company),
+    contractorDistance(contractor, place)
+  ]));
   clearServiceSearch.hidden = false;
   applyFilters();
   fitVisibleMarkers();
@@ -523,6 +545,7 @@ serviceSearchForm.addEventListener('submit', async event => {
 clearServiceSearch.addEventListener('click', () => {
   serviceSearch.value = '';
   activeServiceMatches = null;
+  activeServiceDistances = new Map();
   clearServiceSearch.hidden = true;
   applyFilters();
   fitVisibleMarkers();
