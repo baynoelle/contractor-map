@@ -10,6 +10,19 @@ const stateFips = {
   SC: '45', SD: '46', TN: '47', TX: '48', UT: '49', VT: '50', VA: '51', WA: '53',
   WV: '54', WI: '55', WY: '56'
 };
+const countyServiceAreaOverrides = {
+  'suds mobile cleaning': [
+    { county: 'Kalamazoo', state: 'MI' },
+    { county: 'Kent', state: 'MI' },
+    { county: 'Ottawa', state: 'MI' },
+    { county: 'Allegan', state: 'MI' },
+    { county: 'Wayne', state: 'MI' },
+    { county: 'Branch', state: 'MI' },
+    { county: 'LaPorte', state: 'IN' },
+    { county: 'St. Joseph', state: 'IN' },
+    { county: 'Elkhart', state: 'IN' }
+  ]
+};
 const coordinateCache = new Map();
 
 const map = L.map('map', { zoomControl: true }).setView([39.5, -92.5], 4);
@@ -272,6 +285,8 @@ function serviceAreaHtml(c) {
 }
 
 function serviceAreaCountyTokens(c) {
+  const override = countyServiceAreaOverrides[String(c.company || '').trim().toLowerCase()];
+  if (override) return override;
   if (!c.countyServiceArea) return [];
   return c.countyServiceArea
     .split(/,|;|&|\band\b/i)

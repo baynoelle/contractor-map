@@ -295,7 +295,7 @@ window.CONTRACTORS = [
     "city": "Galesburg",
     "state": "MI",
     "zip": "49053",
-    "countyServiceArea": "",
+    "countyServiceArea": "Kalamazoo County, MI; Kent County, MI; Ottawa County, MI; Allegan County, MI; Wayne County, MI; Branch County, MI; LaPorte County, IN; St. Joseph County, IN; Elkhart County, IN",
     "serviceRadiusRaw": "",
     "serviceRadiusMiles": null,
     "coordinates": {
