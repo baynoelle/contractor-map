@@ -43,9 +43,16 @@ const servicePanel = document.getElementById('servicePanel');
 const markers = [];
 let countyFeatures = null;
 let serviceAreaLayer = null;
+let searchLocationMarker = null;
 let activeServiceMatches = null;
 let activeServiceDistances = new Map();
+let activeTravelTimes = new Map();
 let currentContractors = [];
+
+const maxTravelMinutes = 120;
+const averageDrivingMph = 48;
+const roadDistanceFactor = 1.22;
+const localRoadMinutes = 8;
 
 const esc = value => String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -361,6 +368,35 @@ function contractorDistance(c, place) {
   return distanceMiles(c.coordinates, place);
 }
 
+function estimatedTravelMinutes(c, place) {
+  const directMiles = contractorDistance(c, place);
+  if (!Number.isFinite(directMiles)) return Number.POSITIVE_INFINITY;
+  return Math.round((directMiles * roadDistanceFactor / averageDrivingMph) * 60 + localRoadMinutes);
+}
+
+function formatTravelTime(minutes) {
+  if (!Number.isFinite(minutes)) return '';
+  if (minutes < 60) return `About ${Math.max(5, Math.round(minutes / 5) * 5)} min away`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = Math.round((minutes % 60) / 5) * 5;
+  return `About ${hours} hr${hours === 1 ? '' : 's'}${remainder ? ` ${remainder} min` : ''} away`;
+}
+
+function updateTravelTimeLabels() {
+  list.querySelectorAll('.card').forEach(card => {
+    const existing = card.querySelector('.travel-time');
+    const minutes = activeTravelTimes.get(card.dataset.company);
+    if (!Number.isFinite(minutes)) {
+      existing?.remove();
+      return;
+    }
+    const label = existing || document.createElement('p');
+    label.className = 'travel-time';
+    label.textContent = formatTravelTime(minutes);
+    if (!existing) card.querySelector('h3').insertAdjacentElement('afterend', label);
+  });
+}
+
 function applyFilters() {
   const q = search.value.toLowerCase().trim();
   document.querySelectorAll('.card').forEach(card => {
@@ -389,11 +425,35 @@ function applyFilters() {
     });
     cards.forEach(card => list.appendChild(card));
   }
+  updateTravelTimeLabels();
 }
 
 function fitVisibleMarkers() {
   const visible = markers.filter(marker => map.hasLayer(marker));
+  if (searchLocationMarker && map.hasLayer(searchLocationMarker)) visible.push(searchLocationMarker);
   if (visible.length) map.fitBounds(L.featureGroup(visible).getBounds(), {padding:[35,35]});
+}
+
+function showSearchLocation(place, query) {
+  if (searchLocationMarker) searchLocationMarker.remove();
+  const locationIcon = L.divIcon({
+    className: 'search-location-icon',
+    html: '<span class="search-location-pin" aria-hidden="true"></span>',
+    iconSize: [34, 44],
+    iconAnchor: [17, 42],
+    popupAnchor: [0, -38]
+  });
+  searchLocationMarker = L.marker([place.lat, place.lng], {
+    icon: locationIcon,
+    zIndexOffset: 1000,
+    title: 'Searched address'
+  }).addTo(map).bindPopup(`<div class="popup"><h2>Searched address</h2><p>${esc(place.displayName || query)}</p></div>`);
+}
+
+function clearSearchLocation() {
+  if (!searchLocationMarker) return;
+  searchLocationMarker.remove();
+  searchLocationMarker = null;
 }
 
 function resetMapView() {
@@ -401,8 +461,10 @@ function resetMapView() {
   serviceSearch.value = '';
   activeServiceMatches = null;
   activeServiceDistances = new Map();
+  activeTravelTimes = new Map();
   clearServiceSearch.hidden = true;
   servicePanel.hidden = true;
+  clearSearchLocation();
   clearServiceArea();
   applyFilters();
   fitVisibleMarkers();
@@ -505,6 +567,7 @@ function renderContractors(contractors, sourceLabel) {
   currentContractors = contractors;
   activeServiceMatches = null;
   activeServiceDistances = new Map();
+  activeTravelTimes = new Map();
   clearServiceSearch.hidden = true;
   totalCount.textContent = contractors.length;
   const bounds = [];
@@ -552,24 +615,43 @@ serviceSearchForm.addEventListener('submit', async event => {
   event.preventDefault();
   const query = serviceSearch.value.trim();
   if (!query) return;
-  statusEl.textContent = `Finding contractors for ${query}...`;
+  statusEl.textContent = `Estimating travel times from ${query}...`;
   const place = await geocodePlace(query);
-  const matches = currentContractors.filter(contractor => contractorServicesPlace(contractor, query, place));
+  if (!place) {
+    statusEl.textContent = 'Address not found. Try including the city, state, or ZIP.';
+    return;
+  }
+  showSearchLocation(place, query);
+  const travelTimes = new Map(currentContractors.map(contractor => [
+    normalize(contractor.company),
+    estimatedTravelMinutes(contractor, place)
+  ]));
+  const matches = currentContractors.filter(contractor => (
+    travelTimes.get(normalize(contractor.company)) <= maxTravelMinutes
+  ));
   activeServiceMatches = new Set(matches.map(contractor => normalize(contractor.company)));
   activeServiceDistances = new Map(matches.map(contractor => [
     normalize(contractor.company),
     contractorDistance(contractor, place)
   ]));
+  activeTravelTimes = new Map(matches.map(contractor => [
+    normalize(contractor.company),
+    travelTimes.get(normalize(contractor.company))
+  ]));
   clearServiceSearch.hidden = false;
   applyFilters();
   fitVisibleMarkers();
-  statusEl.textContent = `${matches.length} contractor${matches.length === 1 ? '' : 's'} service ${place?.displayName || query}`;
+  statusEl.textContent = matches.length
+    ? `${matches.length} contractor${matches.length === 1 ? '' : 's'} within approximately 2 hours of ${place.displayName || query}`
+    : `No contractors found within approximately 2 hours of ${place.displayName || query}`;
 });
 
 clearServiceSearch.addEventListener('click', () => {
   serviceSearch.value = '';
   activeServiceMatches = null;
   activeServiceDistances = new Map();
+  activeTravelTimes = new Map();
+  clearSearchLocation();
   clearServiceSearch.hidden = true;
   applyFilters();
   fitVisibleMarkers();

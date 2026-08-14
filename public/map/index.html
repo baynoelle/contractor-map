@@ -7,6 +7,13 @@
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="styles.css">
+  <style>
+    .search-help { margin: 7px 0 0; color: #64748b; font-size: 11px; line-height: 1.35; }
+    .card .travel-time { display: inline-block; margin: 1px 0 5px; padding: 4px 8px; border-radius: 999px; background: #dbeafe; color: #1d4ed8; font-size: 11px; font-weight: 800; }
+    .search-location-icon { background: transparent; border: 0; }
+    .search-location-pin { position: relative; display: block; width: 28px; height: 28px; border: 4px solid #fff; border-radius: 50% 50% 50% 0; background: #20e35e; box-shadow: 0 2px 8px #0f172a66; transform: rotate(-45deg); }
+    .search-location-pin::after { content: ''; position: absolute; width: 8px; height: 8px; left: 10px; top: 10px; border-radius: 50%; background: #fff; }
+  </style>
 </head>
 <body>
   <aside class="sidebar">
@@ -19,12 +26,13 @@
       <div class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" autocomplete="off" placeholder="Company or contact"></div>
     </div>
     <form id="serviceSearchForm" class="service-search">
-      <label for="serviceSearch">Find contractors who service</label>
+      <label for="serviceSearch">Find contractors near an address</label>
       <div class="service-search-row">
-        <input id="serviceSearch" type="search" autocomplete="off" placeholder="Town, county, or ZIP">
+        <input id="serviceSearch" type="search" autocomplete="street-address" placeholder="Street, city, state, or ZIP">
         <button type="submit">Find</button>
       </div>
-      <button id="clearServiceSearch" type="button" hidden>Clear service search</button>
+      <p class="search-help">Shows contractors within approximately 2 hours.</p>
+      <button id="clearServiceSearch" type="button" hidden>Clear address search</button>
     </form>
     <div id="status" class="status">Preparing contractor locations…</div>
     <div id="list" class="list"></div>
