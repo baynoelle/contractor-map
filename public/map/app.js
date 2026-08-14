@@ -302,8 +302,7 @@ function serviceAreaCountyTokens(c) {
       return { county, state };
     })
     .filter(token => token.county && token.county.length < 50 && stateFips[token.state])
-    .filter(token => !/\b(as far as|currently|open to|area|metro|locations?|zip code)\b/i.test(token.county))
-    .slice(0, 12);
+    .filter(token => !/\b(as far as|currently|open to|area|metro|locations?|zip code)\b/i.test(token.county));
 }
 
 async function serviceAreaBoundaries(c) {
