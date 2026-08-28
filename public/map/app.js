@@ -49,7 +49,7 @@ let activeServiceDistances = new Map();
 let activeTravelTimes = new Map();
 let currentContractors = [];
 
-const maxTravelMinutes = 120;
+const maxTravelMinutes = 240;
 const averageDrivingMph = 48;
 const roadDistanceFactor = 1.22;
 const localRoadMinutes = 8;
@@ -276,19 +276,24 @@ function popupHtml(c) {
 }
 
 function serviceAreaHtml(c) {
-  const county = c.countyServiceArea || 'No county service area listed';
   const travelRadius = formatTravelRadius(c);
-  const radius = radiusCanBeMapped(c)
-    ? `${c.serviceRadiusMiles} mile radius shown in blue`
-    : travelRadius || 'No travel radius listed';
+  const county = c.countyServiceArea
+    ? `<p><strong>County service area:</strong> ${esc(c.countyServiceArea)}</p>`
+    : '';
+  const radius = travelRadius
+    ? `<p><strong>Travel radius:</strong> ${esc(travelRadius)}</p>`
+    : '';
   return `<button class="service-close" type="button" aria-label="Hide service area">x</button>
-    <p class="eyebrow">Service Area</p>
-    <h2>${esc(c.company)}</h2>
-    <dl>
-      <div><dt>Base location</dt><dd>${esc([c.city, c.state].filter(Boolean).join(', ') || c.address)}</dd></div>
-      <div><dt>Area notes</dt><dd>${esc(county)}</dd></div>
-      <div><dt>Radius</dt><dd>${esc(radius)}</dd></div>
-    </dl>`;
+    <div class="popup contractor-details">
+      <h2>${esc(c.company)}</h2>
+      <p><strong>Contact:</strong> ${esc(c.contact)}</p>
+      <p><strong>Address:</strong> ${esc(c.address)}</p>
+      ${county}
+      ${radius}
+      <p><strong>Phone:</strong> <a href="tel:${esc(c.phone)}">${esc(c.phone)}</a></p>
+      <p><strong>Email:</strong> <a href="mailto:${esc(c.email)}">${esc(c.email)}</a></p>
+      <div class="actions">${externalLink(c.website,'Website')}${externalLink(c.facebook,'Facebook')}<a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(c.address)}" target="_blank" rel="noopener noreferrer">Directions</a></div>
+    </div>`;
 }
 
 function serviceAreaCountyTokens(c) {
@@ -544,7 +549,6 @@ function addCard(c, marker) {
     const serviceArea = await showServiceArea(marker);
     const view = serviceArea ? L.featureGroup([marker, serviceArea]) : L.featureGroup([marker]);
     map.fitBounds(view.getBounds(), {padding:[35,35], maxZoom:13});
-    marker.openPopup();
   };
   card.addEventListener('click', selectContractor);
   card.addEventListener('keydown', event => {
@@ -575,9 +579,7 @@ function renderContractors(contractors, sourceLabel) {
 
   for (const c of contractors) {
     if (!c.coordinates) { failures++; continue; }
-    const marker = L.marker([c.coordinates.lat, c.coordinates.lng])
-      .addTo(map)
-      .bindPopup(popupHtml(c), {maxWidth:320});
+    const marker = L.marker([c.coordinates.lat, c.coordinates.lng]).addTo(map);
     marker.contractor = c;
     marker.on('click', async () => {
       const serviceArea = await showServiceArea(marker);
@@ -642,8 +644,8 @@ serviceSearchForm.addEventListener('submit', async event => {
   applyFilters();
   fitVisibleMarkers();
   statusEl.textContent = matches.length
-    ? `${matches.length} contractor${matches.length === 1 ? '' : 's'} within approximately 2 hours of ${place.displayName || query}`
-    : `No contractors found within approximately 2 hours of ${place.displayName || query}`;
+    ? `${matches.length} contractor${matches.length === 1 ? '' : 's'} within approximately 4 hours of ${place.displayName || query}`
+    : `No contractors found within approximately 4 hours of ${place.displayName || query}`;
 });
 
 clearServiceSearch.addEventListener('click', () => {
