@@ -202,28 +202,64 @@ async function geocode(query) {
   return { lat: Number(results[0].lat), lng: Number(results[0].lon) };
 }
 
-async function geocodePlace(query) {
-  const url = new URL('https://nominatim.openstreetmap.org/search');
-  url.searchParams.set('format', 'jsonv2');
-  url.searchParams.set('limit', '1');
-  url.searchParams.set('addressdetails', '1');
-  url.searchParams.set('countrycodes', 'us');
-  url.searchParams.set('q', query);
+function addressQueryVariants(query) {
+  const original = String(query || '').trim();
+  const cleaned = original
+    .replace(/[.#]/g, ' ')
+    .replace(/\s*,\s*/g, ', ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const zip = cleaned.match(/\b\d{5}(?:-\d{4})?\b/)?.[0] || '';
+  const parts = cleaned.split(',').map(part => part.trim()).filter(Boolean);
+  const localityParts = parts.filter(part => !/^\d{5}(?:-\d{4})?$/.test(part));
+  const locality = parts.length >= 2 ? parts.slice(-3).join(', ') : '';
+  const cityState = localityParts.length >= 2 ? localityParts.slice(-2).join(', ') : '';
 
-  const response = await fetch(url);
-  if (!response.ok) return null;
-  const results = await response.json();
-  if (!results.length) return null;
-  const result = results[0];
-  return {
-    lat: Number(result.lat),
-    lng: Number(result.lon),
-    county: result.address?.county || '',
-    state: result.address?.state || '',
-    stateCode: result.address?.state_code || '',
-    postcode: result.address?.postcode || '',
-    displayName: result.display_name || query
-  };
+  return [
+    { query: original, matchType: 'address' },
+    { query: cleaned, matchType: 'address' },
+    { query: locality, matchType: 'nearby area' },
+    { query: cityState, matchType: 'city and state' },
+    { query: zip, matchType: 'ZIP code' }
+  ].filter((candidate, index, candidates) => (
+    candidate.query && candidates.findIndex(item => normalize(item.query) === normalize(candidate.query)) === index
+  ));
+}
+
+async function geocodePlace(query) {
+  const candidates = addressQueryVariants(query);
+
+  for (const candidate of candidates) {
+    const url = new URL('https://nominatim.openstreetmap.org/search');
+    url.searchParams.set('format', 'jsonv2');
+    url.searchParams.set('limit', '3');
+    url.searchParams.set('addressdetails', '1');
+    url.searchParams.set('countrycodes', 'us');
+    url.searchParams.set('q', candidate.query);
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) continue;
+      const results = await response.json();
+      if (!results.length) continue;
+      const result = results[0];
+      return {
+        lat: Number(result.lat),
+        lng: Number(result.lon),
+        county: result.address?.county || '',
+        state: result.address?.state || '',
+        stateCode: result.address?.state_code || '',
+        postcode: result.address?.postcode || '',
+        displayName: result.display_name || candidate.query,
+        matchType: candidate.matchType,
+        approximate: candidate.matchType !== 'address'
+      };
+    } catch (error) {
+      // Try the next, broader version when a lookup is unavailable.
+    }
+  }
+
+  return null;
 }
 
 async function getCountyFeatures() {
@@ -620,7 +656,7 @@ serviceSearchForm.addEventListener('submit', async event => {
   statusEl.textContent = `Estimating travel times from ${query}...`;
   const place = await geocodePlace(query);
   if (!place) {
-    statusEl.textContent = 'Address not found. Try including the city, state, or ZIP.';
+    statusEl.textContent = 'Address not found. Try a ZIP code or enter the city and state separated by commas.';
     return;
   }
   showSearchLocation(place, query);
@@ -643,9 +679,10 @@ serviceSearchForm.addEventListener('submit', async event => {
   clearServiceSearch.hidden = false;
   applyFilters();
   fitVisibleMarkers();
+  const matchNote = place.approximate ? ` (approximate ${place.matchType} match)` : '';
   statusEl.textContent = matches.length
-    ? `${matches.length} contractor${matches.length === 1 ? '' : 's'} within approximately 4 hours of ${place.displayName || query}`
-    : `No contractors found within approximately 4 hours of ${place.displayName || query}`;
+    ? `${matches.length} contractor${matches.length === 1 ? '' : 's'} within approximately 4 hours of ${place.displayName || query}${matchNote}`
+    : `No contractors found within approximately 4 hours of ${place.displayName || query}${matchNote}`;
 });
 
 clearServiceSearch.addEventListener('click', () => {
