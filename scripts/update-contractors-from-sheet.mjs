@@ -128,8 +128,6 @@ function contractorGeocodeCandidates(contractor) {
   return uniqueGeocodeCandidates([
     { query: contractor.address },
     { query: address },
-    { query: street },
-    { query: streetWithoutSecondary },
     { query: streetCityStateZip },
     { query: streetCityState },
     { query: cityStateZip },

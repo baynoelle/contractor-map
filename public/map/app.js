@@ -185,7 +185,6 @@ function contractorGeocodeCandidates(contractor) {
   return uniqueGeocodeCandidates([
     { query: contractor.address, matchType: 'address' },
     { query: address, matchType: 'cleaned address' },
-    { query: streetWithoutSecondary, matchType: 'address without suite' },
     { query: streetCityStateZip, matchType: 'cleaned address' },
     { query: streetCityState, matchType: 'cleaned address' },
     { query: cityStateZip, matchType: 'city and ZIP' },
