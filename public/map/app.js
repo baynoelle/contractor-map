@@ -146,6 +146,54 @@ function makeAddress(row, columns) {
   ].map(value => String(value || '').trim()).filter(Boolean).join(', ');
 }
 
+function cleanAddressForGeocoding(value) {
+  return String(value || '')
+    .replace(/\bGargfield\b/gi, 'Garfield')
+    .replace(/\bFt\.?\b/gi, 'Fort')
+    .replace(/\bHwy\b/gi, 'Highway')
+    .replace(/\bSte\.?\b/gi, 'Suite')
+    .replace(/\bP\.?\s*O\.?\s*Box\b/gi, 'PO Box')
+    .replace(/[.#]/g, ' ')
+    .replace(/\s*,\s*/g, ', ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function withoutSecondaryAddress(value) {
+  return cleanAddressForGeocoding(value)
+    .replace(/\s+\b(?:suite|unit|apt|apartment|bldg|building|floor|fl)\b\s*[a-z0-9 -]*?(?=,|$)/i, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+,/g, ',')
+    .trim();
+}
+
+function uniqueGeocodeCandidates(candidates) {
+  return candidates.filter((candidate, index, all) => (
+    candidate.query && all.findIndex(item => normalize(item.query) === normalize(candidate.query)) === index
+  ));
+}
+
+function contractorGeocodeCandidates(contractor) {
+  const address = cleanAddressForGeocoding(contractor.address);
+  const street = cleanAddressForGeocoding(contractor.street || contractor.address);
+  const streetWithoutSecondary = withoutSecondaryAddress(street);
+  const cityStateZip = [contractor.city, contractor.state, contractor.zip].filter(Boolean).join(', ');
+  const cityState = [contractor.city, contractor.state].filter(Boolean).join(', ');
+  const streetCityState = [streetWithoutSecondary, contractor.city, contractor.state].filter(Boolean).join(', ');
+  const streetCityStateZip = [streetWithoutSecondary, contractor.city, contractor.state, contractor.zip].filter(Boolean).join(', ');
+
+  return uniqueGeocodeCandidates([
+    { query: contractor.address, matchType: 'address' },
+    { query: address, matchType: 'cleaned address' },
+    { query: streetWithoutSecondary, matchType: 'address without suite' },
+    { query: streetCityStateZip, matchType: 'cleaned address' },
+    { query: streetCityState, matchType: 'cleaned address' },
+    { query: cityStateZip, matchType: 'city and ZIP' },
+    { query: contractor.zip, matchType: 'ZIP code' },
+    { query: cityState, matchType: 'city and state' }
+  ]);
+}
+
 function contractorFromRow(row, columns) {
   const address = makeAddress(row, columns);
   const company = String(row[columns['Company Name']] || '').trim();
@@ -158,6 +206,7 @@ function contractorFromRow(row, columns) {
     website: cleanUrl(row[columns['Website']]),
     facebook: cleanUrl(row[columns['Facebook Page']]),
     address,
+    street: String(row[columns['Street']] || '').trim(),
     city: String(row[columns['City']] || '').trim(),
     state: String(row[columns['State']] || '').trim(),
     zip: String(row[columns['ZIP Code']] || '').trim(),
@@ -204,26 +253,22 @@ async function geocode(query) {
 
 function addressQueryVariants(query) {
   const original = String(query || '').trim();
-  const cleaned = original
-    .replace(/[.#]/g, ' ')
-    .replace(/\s*,\s*/g, ', ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const cleaned = cleanAddressForGeocoding(original);
+  const noSecondary = withoutSecondaryAddress(cleaned);
   const zip = cleaned.match(/\b\d{5}(?:-\d{4})?\b/)?.[0] || '';
   const parts = cleaned.split(',').map(part => part.trim()).filter(Boolean);
   const localityParts = parts.filter(part => !/^\d{5}(?:-\d{4})?$/.test(part));
   const locality = parts.length >= 2 ? parts.slice(-3).join(', ') : '';
   const cityState = localityParts.length >= 2 ? localityParts.slice(-2).join(', ') : '';
 
-  return [
+  return uniqueGeocodeCandidates([
     { query: original, matchType: 'address' },
-    { query: cleaned, matchType: 'address' },
+    { query: cleaned, matchType: 'cleaned address' },
+    { query: noSecondary, matchType: 'address without suite' },
     { query: locality, matchType: 'nearby area' },
     { query: cityState, matchType: 'city and state' },
     { query: zip, matchType: 'ZIP code' }
-  ].filter((candidate, index, candidates) => (
-    candidate.query && candidates.findIndex(item => normalize(item.query) === normalize(candidate.query)) === index
-  ));
+  ]);
 }
 
 async function geocodePlace(query) {
@@ -276,14 +321,10 @@ async function geocodeMissingContractors(contractors) {
   for (let i = 0; i < missing.length; i++) {
     const contractor = missing[i];
     statusEl.textContent = `Placing new address ${i + 1} of ${missing.length}...`;
-    const candidates = [
-      contractor.address,
-      [contractor.city, contractor.state, contractor.zip].filter(Boolean).join(', '),
-      [contractor.city, contractor.state].filter(Boolean).join(', ')
-    ].filter(Boolean);
+    const candidates = contractorGeocodeCandidates(contractor);
 
     for (const candidate of candidates) {
-      contractor.coordinates = await geocode(candidate);
+      contractor.coordinates = await geocode(candidate.query);
       if (contractor.coordinates) break;
       await sleep(1100);
     }

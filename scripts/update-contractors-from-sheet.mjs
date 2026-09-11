@@ -89,6 +89,55 @@ function makeAddress(row, columns) {
   ].map(value => String(value || '').trim()).filter(Boolean).join(', ');
 }
 
+function cleanAddressForGeocoding(value) {
+  return String(value || '')
+    .replace(/\bGargfield\b/gi, 'Garfield')
+    .replace(/\bFt\.?\b/gi, 'Fort')
+    .replace(/\bHwy\b/gi, 'Highway')
+    .replace(/\bSte\.?\b/gi, 'Suite')
+    .replace(/\bP\.?\s*O\.?\s*Box\b/gi, 'PO Box')
+    .replace(/[.#]/g, ' ')
+    .replace(/\s*,\s*/g, ', ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function withoutSecondaryAddress(value) {
+  return cleanAddressForGeocoding(value)
+    .replace(/\s+\b(?:suite|unit|apt|apartment|bldg|building|floor|fl)\b\s*[a-z0-9 -]*?(?=,|$)/i, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+,/g, ',')
+    .trim();
+}
+
+function uniqueGeocodeCandidates(candidates) {
+  return candidates.filter((candidate, index, all) => (
+    candidate.query && all.findIndex(item => normalize(item.query) === normalize(candidate.query)) === index
+  ));
+}
+
+function contractorGeocodeCandidates(contractor) {
+  const address = cleanAddressForGeocoding(contractor.address);
+  const street = cleanAddressForGeocoding(contractor.street || contractor.address);
+  const streetWithoutSecondary = withoutSecondaryAddress(street);
+  const cityStateZip = [contractor.city, contractor.state, contractor.zip].filter(Boolean).join(', ');
+  const cityState = [contractor.city, contractor.state].filter(Boolean).join(', ');
+  const streetCityState = [streetWithoutSecondary, contractor.city, contractor.state].filter(Boolean).join(', ');
+  const streetCityStateZip = [streetWithoutSecondary, contractor.city, contractor.state, contractor.zip].filter(Boolean).join(', ');
+
+  return uniqueGeocodeCandidates([
+    { query: contractor.address },
+    { query: address },
+    { query: street },
+    { query: streetWithoutSecondary },
+    { query: streetCityStateZip },
+    { query: streetCityState },
+    { query: cityStateZip },
+    { query: contractor.zip },
+    { query: cityState }
+  ]);
+}
+
 async function geocode(address) {
   const url = new URL('https://nominatim.openstreetmap.org/search');
   url.searchParams.set('format', 'jsonv2');
@@ -111,14 +160,10 @@ async function geocode(address) {
 }
 
 async function geocodeContractor(contractor) {
-  const candidates = [
-    contractor.address,
-    [contractor.city, contractor.state, contractor.zip].filter(Boolean).join(', '),
-    [contractor.city, contractor.state].filter(Boolean).join(', ')
-  ].filter(Boolean);
+  const candidates = contractorGeocodeCandidates(contractor);
 
   for (const candidate of candidates) {
-    const coordinates = await geocode(candidate);
+    const coordinates = await geocode(candidate.query);
     if (coordinates) return coordinates;
     await sleep(1100);
   }
@@ -164,6 +209,7 @@ for (const row of rows.slice(1)) {
     website: cleanUrl(row[columns['Website']]),
     facebook: cleanUrl(row[columns['Facebook Page']]),
     address,
+    street: String(row[columns['Street']] || '').trim(),
     city: String(row[columns['City']] || '').trim(),
     state: String(row[columns['State']] || '').trim(),
     zip: String(row[columns['ZIP Code']] || '').trim(),
