@@ -611,7 +611,7 @@ async function showServiceArea(marker) {
   return serviceAreaLayer;
 }
 
-function addCard(c, marker) {
+function addCard(c, marker = null) {
   const card = document.createElement('article');
   card.className = 'card';
   card.dataset.company = normalize(c.company);
@@ -619,7 +619,17 @@ function addCard(c, marker) {
   card.dataset.search = searchableText(c);
   const travelRadius = formatTravelRadius(c);
   const radius = travelRadius ? `<p>${esc(travelRadius)} travel radius</p>` : '';
-  card.innerHTML = `<h3><span class="dot"></span>${esc(c.company)}</h3><p>${esc(c.contact)}</p><p>${esc(c.address)}</p>${radius}`;
+  const address = c.address
+    ? `<p>${esc(c.address)}</p>`
+    : '<p class="unavailable">Address needed for map pin</p>';
+  const pinNote = marker
+    ? ''
+    : '<p class="unavailable">Listed from Google Sheet; needs a cleaner address before a pin can be placed.</p>';
+  card.innerHTML = `<h3><span class="dot"></span>${esc(c.company)}</h3><p>${esc(c.contact)}</p>${address}${radius}${pinNote}`;
+  if (!marker) {
+    list.appendChild(card);
+    return;
+  }
   card.tabIndex = 0;
   card.setAttribute('role', 'button');
   card.setAttribute('aria-label', `Show ${c.company} on the map`);
@@ -658,7 +668,11 @@ function renderContractors(contractors, sourceLabel) {
   let failures = 0;
 
   for (const c of contractors) {
-    if (!c.coordinates) { failures++; continue; }
+    if (!c.coordinates) {
+      failures++;
+      addCard(c);
+      continue;
+    }
     const marker = L.marker([c.coordinates.lat, c.coordinates.lng]).addTo(map);
     marker.contractor = c;
     marker.on('click', async () => {
@@ -675,7 +689,7 @@ function renderContractors(contractors, sourceLabel) {
   mappedCount.textContent = markers.length;
   if (bounds.length) map.fitBounds(bounds, {padding:[35,35]});
   statusEl.textContent = failures
-    ? `${markers.length} mapped from ${sourceLabel} · ${failures} need cleaner addresses`
+    ? `${markers.length} mapped from ${sourceLabel} · ${failures} listed without pins until addresses are cleaner`
     : `${markers.length} pins loaded from ${sourceLabel}`;
 }
 
@@ -719,6 +733,7 @@ serviceSearchForm.addEventListener('submit', async event => {
   ]));
   const matches = currentContractors.filter(contractor => (
     travelTimes.get(normalize(contractor.company)) <= maxTravelMinutes
+    || contractorServicesPlace(contractor, query, place)
   ));
   activeServiceMatches = new Set(matches.map(contractor => normalize(contractor.company)));
   activeServiceDistances = new Map(matches.map(contractor => [
