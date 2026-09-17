@@ -243,11 +243,15 @@ async function geocode(query) {
   url.searchParams.set('countrycodes', 'us');
   url.searchParams.set('q', query);
 
-  const response = await fetch(url);
-  if (!response.ok) return null;
-  const results = await response.json();
-  if (!results.length) return null;
-  return { lat: Number(results[0].lat), lng: Number(results[0].lon) };
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const results = await response.json();
+    if (!results.length) return null;
+    return { lat: Number(results[0].lat), lng: Number(results[0].lon) };
+  } catch (error) {
+    return null;
+  }
 }
 
 function addressQueryVariants(query) {
@@ -677,14 +681,23 @@ function renderContractors(contractors, sourceLabel) {
 
 async function load() {
   statusEl.textContent = 'Loading latest Google Sheet...';
+  let contractors = null;
+
   try {
-    const contractors = await loadSheetContractors();
-    await geocodeMissingContractors(contractors);
-    renderContractors(contractors, 'Google Sheet');
+    contractors = await loadSheetContractors();
   } catch (error) {
     renderContractors(window.CONTRACTORS || [], 'saved backup');
     statusEl.textContent = 'Showing saved backup because the Google Sheet could not load';
+    return;
   }
+
+  try {
+    await geocodeMissingContractors(contractors);
+  } catch (error) {
+    statusEl.textContent = 'Showing latest Google Sheet; some new addresses still need cleaner formatting';
+  }
+
+  renderContractors(contractors, 'Google Sheet');
 }
 
 search.addEventListener('input', applyFilters);

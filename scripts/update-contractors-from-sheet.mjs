@@ -143,18 +143,22 @@ async function geocode(address) {
   url.searchParams.set('countrycodes', 'us');
   url.searchParams.set('q', address);
 
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'contractor-map-data-refresh/1.0 (support@wekeepticlean.com)'
-    }
-  });
-  if (!response.ok) return null;
-  const results = await response.json();
-  if (!results.length) return null;
-  return {
-    lat: Number(results[0].lat),
-    lng: Number(results[0].lon)
-  };
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'contractor-map-data-refresh/1.0 (support@wekeepitclean.com)'
+      }
+    });
+    if (!response.ok) return null;
+    const results = await response.json();
+    if (!results.length) return null;
+    return {
+      lat: Number(results[0].lat),
+      lng: Number(results[0].lon)
+    };
+  } catch (error) {
+    return null;
+  }
 }
 
 async function geocodeContractor(contractor) {
